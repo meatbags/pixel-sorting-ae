@@ -34,35 +34,29 @@ typedef unsigned short PixelType;
 enum {
 	INPUT_LAYER = 0,
 	PARAM_MODE,
-	PARAM_RADIUS,
-	PARAM_AA,
-	PARAM_ANGLE_0,
-	PARAM_ANGLE_1,
-	PARAM_ANGLE_2,
-	PARAM_ANGLE_3,
-	PARAM_USE_GREYSCALE,
+	PARAM_KEY,
+	PARAM_ORDER,
+	PARAM_ANGLE,
+	PARAM_LENGTH,
+	PARAM_CENTRE,
+	PARAM_MASK_ACTIVE,
+	PARAM_MASK_LAYER,
+	PARAM_MASK_SCALE,
 	PARAM_COUNT
 };
 
 typedef struct {
-	A_u_char mode;
-	double grid_step;
-	double grid_half_step;
-	double aa;
-	double angle_0;
-	double angle_1;
-	double angle_2;
-	double angle_3;
+	int mode;
+	int key;
+	int order;
+	double angle;
+	double length;
+	Vector vec = Vector(0, 0);
+	Vector centre = Vector(0, 0);
 	PF_EffectWorld *ref;
-	PF_InData in_data;
-	PF_SampPB samp_pb;
-	PF_Boolean greyscale;
-	//PF_ProgPtr ref;
-	Vector origin = Vector(0, 0);
-	Vector normal_0 = Vector(0, 0);
-	Vector normal_1 = Vector(0, 0);
-	Vector normal_2 = Vector(0, 0);
-	Vector normal_3 = Vector(0, 0);
+	PF_EffectWorld *mask;
+	bool mask_active;
+	double mask_scale;
 } PixelSortInfo;
 
 #ifdef __cplusplus

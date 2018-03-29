@@ -1,1 +1,3 @@
-# pixel-sorting-ae
+# Pixel Sort
+
+Comprehensive pixel-sorting tools for Adobe After Effects.

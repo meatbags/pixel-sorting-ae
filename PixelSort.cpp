@@ -11,36 +11,15 @@ static PF_Err PixelSort8(
 	PF_Err err = PF_Err_NONE;
 	register PixelSortInfo *info = (PixelSortInfo*)refcon;
 
-	// sample CMY colour grids
-	Vector vec(xL, yL);
-	Sampler sampler_c = getSampler(vec.x, vec.y, info->origin, info->normal_1, info->grid_step, info->grid_half_step);
-	Sampler sampler_m = getSampler(vec.x, vec.y, info->origin, info->normal_2, info->grid_step, info->grid_half_step);
-	Sampler sampler_y = getSampler(vec.x, vec.y, info->origin, info->normal_3, info->grid_step, info->grid_half_step);
-	ERR(sampler_c.sample8(info));
-	ERR(sampler_m.sample8(info));
-	ERR(sampler_y.sample8(info));
-
-	// reset output, write channels
 	outP->alpha = inP->alpha;
-	outP->red = PF_MAX_CHAN8;
-	outP->green = PF_MAX_CHAN8;
-	outP->blue = PF_MAX_CHAN8;
-	ERR(sampler_c.write8(1, &outP->red, vec, info->mode, info->grid_step, info->aa));
-	ERR(sampler_m.write8(2, &outP->green, vec, info->mode, info->grid_step, info->aa));
-	ERR(sampler_y.write8(3, &outP->blue, vec, info->mode, info->grid_step, info->aa));
-
-	if (info->greyscale) {
-		A_u_char average = (A_u_char)floor((outP->red + outP->green + outP->blue) / 3.0);
-		outP->red = average;
-		outP->green = average;
-		outP->blue = average;
-	}
+	outP->red = inP->red;
+	outP->green = inP->green;
+	outP->blue = inP->blue;
 
 	return err;
 }
 
-static PF_Err
-PixelSort16(
+static PF_Err PixelSort16(
 	void *refcon,
 	A_long xL,
 	A_long yL,
@@ -48,33 +27,12 @@ PixelSort16(
 	PF_Pixel16 *outP
 ) {
 	PF_Err err = PF_Err_NONE;
-	register PixelSortInfo *info = (PixelSortInfo*)refcon;
 
-	// sample CMY colour grids
-	Vector vec(xL, yL);
-	Sampler sampler_c = getSampler(vec.x, vec.y, info->origin, info->normal_1, info->grid_step, info->grid_half_step);
-	Sampler sampler_m = getSampler(vec.x, vec.y, info->origin, info->normal_2, info->grid_step, info->grid_half_step);
-	Sampler sampler_y = getSampler(vec.x, vec.y, info->origin, info->normal_3, info->grid_step, info->grid_half_step);
-	ERR(sampler_c.sample16(info));
-	ERR(sampler_m.sample16(info));
-	ERR(sampler_y.sample16(info));
-
-	// reset output, write channels
 	outP->alpha = inP->alpha;
-	outP->red = PF_MAX_CHAN16;
-	outP->green = PF_MAX_CHAN16;
-	outP->blue = PF_MAX_CHAN16;
-	ERR(sampler_c.write16(1, &outP->red, vec, info->mode, info->grid_step, info->aa));
-	ERR(sampler_m.write16(2, &outP->green, vec, info->mode, info->grid_step, info->aa));
-	ERR(sampler_y.write16(3, &outP->blue, vec, info->mode, info->grid_step, info->aa));
-
-	if (info->greyscale) {
-		A_u_short average = (A_u_short)floor((outP->red + outP->green + outP->blue) / 3.0);
-		outP->red = average;
-		outP->green = average;
-		outP->blue = average;
-	}
-
+	outP->red = inP->red;
+	outP->green = inP->green;
+	outP->blue = inP->blue;
+	
 	return err;
 }
 
@@ -93,31 +51,20 @@ Render(
 
 	// get user options
 	AEFX_CLR_STRUCT(info);
-	info.mode = (A_u_char)params[PARAM_MODE]->u.pd.value;
-	info.grid_step = ((double)params[PARAM_RADIUS]->u.fs_d.value) * ((double)inputP->width / (double)in_data->width);
-	info.grid_half_step = info.grid_step * 0.5;
-	info.aa = max(0.25, (double)params[PARAM_AA]->u.fs_d.value);
-	info.angle_0 = FIX2D(params[PARAM_ANGLE_0]->u.ad.value) * PF_RAD_PER_DEGREE;
-	info.angle_1 = FIX2D(params[PARAM_ANGLE_1]->u.ad.value) * PF_RAD_PER_DEGREE;
-	info.angle_2 = FIX2D(params[PARAM_ANGLE_2]->u.ad.value) * PF_RAD_PER_DEGREE;
-	info.angle_3 = FIX2D(params[PARAM_ANGLE_3]->u.ad.value) * PF_RAD_PER_DEGREE;
-	info.greyscale = PF_Boolean((params[PARAM_USE_GREYSCALE]->u.bd.value));
-	info.in_data = *in_data;
-	info.samp_pb.src = inputP;
-
+	double qscale = ((double)inputP->width / (double)in_data->width);
+	info.mode = (int)params[PARAM_MODE]->u.pd.value;
+	info.key = (int)params[PARAM_KEY]->u.pd.value;
+	info.order = (int)params[PARAM_ORDER]->u.pd.value;
+	info.angle = FIX2D(params[PARAM_ANGLE]->u.ad.value);
+	info.vec.set(cos(info.angle), sin(info.angle));
+	info.length = FIX2D(params[PARAM_LENGTH]->u.ad.value) * qscale;
+	info.centre.set(FIX2D(params[PARAM_CENTRE]->u.td.x_value), FIX2D(params[PARAM_CENTRE]->u.td.y_value));
 	info.ref = inputP;
-
-	//info.samp_pb.x_radius = D2FIX(2.0);
-	//info.samp_pb.y_radius = D2FIX(2.0);
-
-	// get grid vectors
-	double centre_x = 0; // inputP->width * 0.5 - fmod(inputP->width * 0.5, info.grid_step);
-	double centre_y = 0; // inputP->height * 0.5 - fmod(inputP->height * 0.5, info.grid_step);
-	info.origin.set(centre_x, centre_y);
-	info.normal_0.set(cos(info.angle_0 + HALF_PI), sin(info.angle_0 + HALF_PI));
-	info.normal_1.set(cos(info.angle_1 + HALF_PI), sin(info.angle_1 + HALF_PI));
-	info.normal_2.set(cos(info.angle_2 + HALF_PI), sin(info.angle_2 + HALF_PI));
-	info.normal_3.set(cos(info.angle_3 + HALF_PI), sin(info.angle_3 + HALF_PI));
+	info.mask_active = params[PARAM_MASK_ACTIVE]->u.bd.value == 1;
+	if (info.mask_active) {
+		info.mask = &params[PARAM_MASK_LAYER]->u.ld;
+		info.mask_scale = FIX2D(params[PARAM_MASK_SCALE]->u.ad.value);
+	}
 
 	if (PF_WORLD_IS_DEEP(output)) {
 		ERR(suites.Iterate16Suite1()->iterate(in_data, 0, linesL, inputP, NULL, (void*)&info, PixelSort16, output));
@@ -135,7 +82,7 @@ static PF_Err About(
 	PF_LayerDef *output
 ) {
 	AEGP_SuiteHandler suites(in_data->pica_basicP);
-	suites.ANSICallbacksSuite1()->sprintf(out_data->return_msg, "%s v%d.%d\r%s", "Colour PixelSort", MAJOR_VERSION, MINOR_VERSION, "Colour PixelSort operations by @meatbags");
+	suites.ANSICallbacksSuite1()->sprintf(out_data->return_msg, "%s v%d.%d\r%s", "PixelSort", MAJOR_VERSION, MINOR_VERSION, "Pixel-sorting operations by @meatbags");
 
 	return PF_Err_NONE;
 }
@@ -159,22 +106,25 @@ static PF_Err ParamsSetup(
 	PF_LayerDef	*output
 ) {
 	PF_ParamDef	def;
+
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_POPUP("Mode", 7, 1, "Round|Square|Euclidean Dot|Ellipse|Line|Diamond|Flower", PARAM_MODE);
+	PF_ADD_POPUP("Mode", 4, 1, "Vector|Vertical|Horizontal|Radial", PARAM_MODE);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_FLOAT_SLIDER("Size", 0, 256, 0, 32, 0, 5, 0, 0, 0, PARAM_RADIUS);
+	PF_ADD_POPUP("Compare", 1, 1, "Lightness", PARAM_KEY);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_FLOAT_SLIDER("Soften", 0, 256, 0, 32, 0, 1, 0, 0, 0, PARAM_AA);
+	PF_ADD_POPUP("Order", 4, 1, "Ascending|Descending|Dip|Rise", PARAM_ORDER);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_ANGLE("Sample", 45, PARAM_ANGLE_0);
+	PF_ADD_ANGLE("Direction", 45, PARAM_ANGLE);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_ANGLE("Channel 1", 45, PARAM_ANGLE_1);
+	PF_ADD_SLIDER("Length", 1, 3000, 1, 100, 10, PARAM_LENGTH);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_ANGLE("Channel 2", 45, PARAM_ANGLE_2);
+	PF_ADD_POINT("Centre", 0, 0, 0, PARAM_CENTRE);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_ANGLE("Channel 3", 45, PARAM_ANGLE_3);
+	PF_ADD_CHECKBOXX("Use Mask", 0, 0, PARAM_MASK_ACTIVE);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_CHECKBOXX("Greyscale", 0, 0, PARAM_USE_GREYSCALE);
+	PF_ADD_LAYER("Mask Layer", 0, PARAM_MASK_LAYER);
+	AEFX_CLR_STRUCT(def);
+	PF_ADD_FLOAT_SLIDER("Mask Amount", 0, 100, 0, 100, 0, 100, 0, 0, 0, PARAM_MASK_SCALE);
 	out_data->num_params = PARAM_COUNT;
 
 	return PF_Err_NONE;
