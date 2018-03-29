@@ -13,16 +13,43 @@ PF_Pixel8 *getPixel8(
 	return ((PF_Pixel8 *)((char*)inputP->data + (y * inputP->rowbytes) + x * sizeof(PF_Pixel8)));
 }
 
-struct PixelIndex8 {
+void copyPixel8(
+	PF_Pixel8 *in,
+	PF_Pixel8 *out
+) {
+	out->alpha = in->alpha;
+	out->red = in->red;
+	out->green = in->green;
+	out->blue = in->blue;
+}
+
+struct PixelKey8 {
 	PF_Pixel8 *pixel;
-	int index;
+	double key;
 };
 
 struct Sorter8 {
 	Vector vec = Vector(0, 0);
+	int pixel_index;
+	int length;
 
 	Sorter8(double x, double y, Vector normal) {
-		vec = projectGrid(x, y, normal);
+		vec = projectGrid(x + 0.5, y + 0.5, normal);
+	}
+
+	double getKey(
+		PF_Pixel8 *pixel,
+		int key
+	) {
+		// get comparison key
+		if (key == KEY_LIGHTNESS) {
+			return (pixel->red + pixel->blue + pixel->green) / (3.0 * (double)PF_MAX_CHAN8);
+		} else if (key == KEY_DARKNESS) {
+			return 1.0 - (pixel->red + pixel->blue + pixel->green) / (3.0 * (double)PF_MAX_CHAN8);
+		}
+		
+		// lightness
+		return (pixel->red + pixel->blue + pixel->green) / (3.0 * (double)PF_MAX_CHAN8);
 	}
 
 	bool valid(
@@ -31,23 +58,15 @@ struct Sorter8 {
 		double threshold
 	) {
 		// check if pixel passes
-		double value;
-
-		if (key == KEY_LIGHTNESS) {
-			value = (pixel->red + pixel->blue + pixel->green) / (3.0 * (double)PF_MAX_CHAN8);
-		} else {
-			value = 1.0 - (pixel->red + pixel->blue + pixel->green) / (3.0 * (double)PF_MAX_CHAN8);
-		}
-		
-		return (value >= threshold);
+		return (getKey(pixel, key) >= threshold);
 	}
 
 	int getPixels(
 		PixelSortInfo *info,
-		PixelIndex8 *pixels
+		PixelKey8 *pixels
 	) {
 		// get array of valid pixels
-		int valid_count = 0;
+		int pixel_count = 0;
 
 		for (int i = 0; i < info->length; ++i) {
 			if (!vec.inBounds(info->ref->width, info->ref->height) ||
@@ -55,23 +74,28 @@ struct Sorter8 {
 				break;
 			}
 			vec.sub(info->vec);
-			valid_count++;
+			pixel_count++;
 		}
 
 		// invalid chunk
-		if (!valid_count) {
-			return valid_count;
+		if (!pixel_count) {
+			return pixel_count;
 		}
 
-		// populate pixel array
+		pixel_index = pixel_count - 1;
+
+		// populate pixel array, generate keys
 		for (int i = 0; i < info->length; ++i) {
-			if (i < valid_count) {
+			if (i <= pixel_index) {
 				pixels[i].pixel = getPixel8(info->ref, (int)vec.x, (int)vec.y);
+				pixels[i].key = getKey(pixels[i].pixel, info->key);
 			} else {
 				if (vec.inBounds(info->ref->width, info->ref->height)) {
 					pixels[i].pixel = getPixel8(info->ref, (int)vec.x, (int)vec.y);
+					pixels[i].key = getKey(pixels[i].pixel, info->key);
+
 					if (valid(pixels[i].pixel, info->key, info->threshold)) {
-						valid_count++;
+						pixel_count++;
 						vec.add(info->vec);
 					} else {
 						break;
@@ -82,31 +106,33 @@ struct Sorter8 {
 			}
 		}
 
-		return valid_count;
+		return pixel_count;
+	}
+
+	void sortPixels(
+		PixelKey8 *pixels,
+		int order
+	) {
+
 	}
 
 	PF_Err sort(
 		PixelSortInfo *info,
-		PF_Pixel8 *outP,
-		PixelIndex8 *pixels
+		PF_Pixel8 *out,
+		PixelKey8 *pixels
 	) {
 		PF_Err err = PF_Err_NONE;
-		int len = getPixels(info, pixels);
+		length = getPixels(info, pixels);
 
-
+		if (length) {
+			sortPixels(pixels, info->order);
+			copyPixel8(pixels[pixel_index].pixel, out);
+		} else {
+			copyPixel8(getPixel8(info->ref, (int)vec.x, (int)vec.y), out);
+		}
 
 		return err;
 	}
 };
-
-/*
-PF_Pixel16 *getPixel16(
-	PF_EffectWorld *inputP,
-	int x,
-	int y
-) {
-	return ((PF_Pixel16 *)((char*)inputP->data + (y * inputP->rowbytes) + x * sizeof(PF_Pixel16)));
-}
-*/
 
 #endif

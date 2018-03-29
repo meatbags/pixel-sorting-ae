@@ -14,8 +14,8 @@ static PF_Err PixelSort8(
 
 	// allocate memory
 	AEGP_MemHandle mem_handle;
-	int mem_size = info->length * sizeof(PixelIndex8);
-	PixelIndex8 *pixels;
+	int mem_size = info->length * sizeof(PixelKey8);
+	PixelKey8 *pixels;
 	ERR(suites.MemorySuite1()->AEGP_NewMemHandle(NULL, "PixelIndex8[] memory allocation error.", mem_size, AEGP_MemFlag_NONE, &mem_handle));
 	ERR(suites.MemorySuite1()->AEGP_LockMemHandle(mem_handle, (void**)&pixels));
 	
