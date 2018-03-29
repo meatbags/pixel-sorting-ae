@@ -1,5 +1,5 @@
 #include "PixelSort.hpp"
-#include "PixelSortSampler.hpp"
+#include "PixelSortSorter.hpp"
 
 static PF_Err PixelSort8(
 	void *refcon,
@@ -11,10 +11,9 @@ static PF_Err PixelSort8(
 	PF_Err err = PF_Err_NONE;
 	register PixelSortInfo *info = (PixelSortInfo*)refcon;
 
-	outP->alpha = inP->alpha;
-	outP->red = inP->red;
-	outP->green = inP->green;
-	outP->blue = inP->blue;
+	Sorter sorter = Sorter(xL, yL);
+	ERR(sorter.sample8(info));
+	ERR(sorter.sort8(outP));
 
 	return err;
 }
@@ -55,15 +54,17 @@ Render(
 	info.mode = (int)params[PARAM_MODE]->u.pd.value;
 	info.key = (int)params[PARAM_KEY]->u.pd.value;
 	info.order = (int)params[PARAM_ORDER]->u.pd.value;
-	info.angle = FIX2D(params[PARAM_ANGLE]->u.ad.value);
+	info.angle = FIX2D(params[PARAM_ANGLE]->u.ad.value) * PF_RAD_PER_DEGREE;
 	info.vec.set(cos(info.angle), sin(info.angle));
-	info.length = FIX2D(params[PARAM_LENGTH]->u.ad.value) * qscale;
+	info.length = (int)params[PARAM_LENGTH]->u.sd.value;
+	info.threshold = (double)params[PARAM_THRESHOLD]->u.fs_d.value / 100.0;
 	info.centre.set(FIX2D(params[PARAM_CENTRE]->u.td.x_value), FIX2D(params[PARAM_CENTRE]->u.td.y_value));
 	info.ref = inputP;
 	info.mask_active = params[PARAM_MASK_ACTIVE]->u.bd.value == 1;
+	
 	if (info.mask_active) {
 		info.mask = &params[PARAM_MASK_LAYER]->u.ld;
-		info.mask_scale = FIX2D(params[PARAM_MASK_SCALE]->u.ad.value);
+		info.mask_scale = FIX2D(params[PARAM_MASK_SCALE]->u.ad.value) / 100.0;
 	}
 
 	if (PF_WORLD_IS_DEEP(output)) {
@@ -117,6 +118,8 @@ static PF_Err ParamsSetup(
 	PF_ADD_ANGLE("Direction", 45, PARAM_ANGLE);
 	AEFX_CLR_STRUCT(def);
 	PF_ADD_SLIDER("Length", 1, 3000, 1, 100, 10, PARAM_LENGTH);
+	AEFX_CLR_STRUCT(def);
+	PF_ADD_FLOAT_SLIDER("Threshold", 0, 100, 0, 100, 0, 100, 0, 0, 0, PARAM_THRESHOLD);
 	AEFX_CLR_STRUCT(def);
 	PF_ADD_POINT("Centre", 0, 0, 0, PARAM_CENTRE);
 	AEFX_CLR_STRUCT(def);

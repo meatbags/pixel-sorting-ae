@@ -1,6 +1,6 @@
 #pragma once
-#ifndef PixelSort_H
-#define PixelSort_H
+#ifndef PIXEL_SORT_H
+#define PIXEL_SORT_H
 
 #define PF_TABLE_BITS 12
 #define PF_TABLE_SZ_16 4096
@@ -38,6 +38,7 @@ enum {
 	PARAM_ORDER,
 	PARAM_ANGLE,
 	PARAM_LENGTH,
+	PARAM_THRESHOLD,
 	PARAM_CENTRE,
 	PARAM_MASK_ACTIVE,
 	PARAM_MASK_LAYER,
@@ -50,7 +51,8 @@ typedef struct {
 	int key;
 	int order;
 	double angle;
-	double length;
+	int length;
+	double threshold;
 	Vector vec = Vector(0, 0);
 	Vector centre = Vector(0, 0);
 	PF_EffectWorld *ref;
@@ -62,7 +64,6 @@ typedef struct {
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 	DllExport PF_Err
 	EntryPointFunc(
 		PF_Cmd cmd,
@@ -72,8 +73,7 @@ extern "C" {
 		PF_LayerDef	*output,
 		void *extra
 	);
-
 #ifdef __cplusplus
 }
 #endif
-#endif // PixelSort_H
+#endif
