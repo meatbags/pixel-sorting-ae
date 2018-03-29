@@ -59,6 +59,7 @@ typedef struct {
 	PF_EffectWorld *mask;
 	bool mask_active;
 	double mask_scale;
+	PF_InData *in_data;
 } PixelSortInfo;
 
 #ifdef __cplusplus

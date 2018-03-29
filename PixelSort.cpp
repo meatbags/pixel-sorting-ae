@@ -10,10 +10,22 @@ static PF_Err PixelSort8(
 ) {
 	PF_Err err = PF_Err_NONE;
 	register PixelSortInfo *info = (PixelSortInfo*)refcon;
+	AEGP_SuiteHandler suites(info->in_data->pica_basicP);
 
-	Sorter sorter = Sorter(xL, yL);
-	ERR(sorter.sample8(info));
-	ERR(sorter.sort8(outP));
+	// allocate memory
+	AEGP_MemHandle mem_handle;
+	int mem_size = info->length * sizeof(PixelIndex8);
+	PixelIndex8 *pixels;
+	ERR(suites.MemorySuite1()->AEGP_NewMemHandle(NULL, "PixelIndex8[] memory allocation error.", mem_size, AEGP_MemFlag_NONE, &mem_handle));
+	ERR(suites.MemorySuite1()->AEGP_LockMemHandle(mem_handle, (void**)&pixels));
+	
+	// sort
+	Sorter8 sorter = Sorter8(xL, yL, info->vec);
+	ERR(sorter.sort(info, outP, pixels));
+
+	// free memory
+	suites.MemorySuite1()->AEGP_UnlockMemHandle(mem_handle);
+	suites.MemorySuite1()->AEGP_FreeMemHandle(mem_handle);
 
 	return err;
 }
@@ -37,31 +49,31 @@ static PF_Err PixelSort16(
 
 static PF_Err
 Render(
-	PF_InData		*in_data,
-	PF_OutData		*out_data,
-	PF_ParamDef		*params[],
-	PF_LayerDef		*output
+	PF_InData *in_data,
+	PF_OutData *out_data,
+	PF_ParamDef	*params[],
+	PF_LayerDef	*output
 ) {
 	PF_Err err = PF_Err_NONE;
 	AEGP_SuiteHandler suites(in_data->pica_basicP);
 	A_long linesL = output->extent_hint.bottom - output->extent_hint.top;
 	PixelSortInfo info;
 	PF_EffectWorld *inputP = &params[INPUT_LAYER]->u.ld;
+	double qscale = ((double)inputP->width / (double)in_data->width);
 
 	// get user options
 	AEFX_CLR_STRUCT(info);
-	double qscale = ((double)inputP->width / (double)in_data->width);
 	info.mode = (int)params[PARAM_MODE]->u.pd.value;
 	info.key = (int)params[PARAM_KEY]->u.pd.value;
 	info.order = (int)params[PARAM_ORDER]->u.pd.value;
 	info.angle = FIX2D(params[PARAM_ANGLE]->u.ad.value) * PF_RAD_PER_DEGREE;
 	info.vec.set(cos(info.angle), sin(info.angle));
 	info.length = (int)params[PARAM_LENGTH]->u.sd.value;
-	info.threshold = (double)params[PARAM_THRESHOLD]->u.fs_d.value / 100.0;
+	info.threshold = params[PARAM_THRESHOLD]->u.fs_d.value / 100.0;
 	info.centre.set(FIX2D(params[PARAM_CENTRE]->u.td.x_value), FIX2D(params[PARAM_CENTRE]->u.td.y_value));
 	info.ref = inputP;
+	info.in_data = in_data;
 	info.mask_active = params[PARAM_MASK_ACTIVE]->u.bd.value == 1;
-	
 	if (info.mask_active) {
 		info.mask = &params[PARAM_MASK_LAYER]->u.ld;
 		info.mask_scale = FIX2D(params[PARAM_MASK_SCALE]->u.ad.value) / 100.0;
@@ -111,15 +123,15 @@ static PF_Err ParamsSetup(
 	AEFX_CLR_STRUCT(def);
 	PF_ADD_POPUP("Mode", 4, 1, "Vector|Vertical|Horizontal|Radial", PARAM_MODE);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_POPUP("Compare", 1, 1, "Lightness", PARAM_KEY);
+	PF_ADD_POPUP("Compare", 2, 1, "Lightness|Darkness", PARAM_KEY);
 	AEFX_CLR_STRUCT(def);
 	PF_ADD_POPUP("Order", 4, 1, "Ascending|Descending|Dip|Rise", PARAM_ORDER);
 	AEFX_CLR_STRUCT(def);
 	PF_ADD_ANGLE("Direction", 45, PARAM_ANGLE);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_SLIDER("Length", 1, 3000, 1, 100, 10, PARAM_LENGTH);
+	PF_ADD_SLIDER("Length", 1, 3000, 1, 100, 8, PARAM_LENGTH);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_FLOAT_SLIDER("Threshold", 0, 100, 0, 100, 0, 100, 0, 0, 0, PARAM_THRESHOLD);
+	PF_ADD_FLOAT_SLIDER("Threshold", 0, 100, 0, 100, 0, 50, 0, 0, 0, PARAM_THRESHOLD);
 	AEFX_CLR_STRUCT(def);
 	PF_ADD_POINT("Centre", 0, 0, 0, PARAM_CENTRE);
 	AEFX_CLR_STRUCT(def);

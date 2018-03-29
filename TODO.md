@@ -1,1 +1,1 @@
-colour support: 16/32bc
+buy milk, eggs

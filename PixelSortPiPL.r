@@ -11,7 +11,7 @@ resource 'PiPL' (16000) {
 			AEEffect
 		},
 		Name {
-			"Advanced Pixel Sort"
+			"Pixel Sort Suite"
 		},
 		Category {
 			"Meatbags"

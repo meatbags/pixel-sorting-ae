@@ -24,6 +24,20 @@ struct Vector {
 		y = y_set;
 	}
 
+	void add(Vector vec) {
+		x += vec.x;
+		y += vec.y;
+	}
+
+	void sub(Vector vec) {
+		x -= vec.x;
+		y -= vec.y;
+	}
+
+	bool inBounds(double width, double height) {
+		return x > 0 && y > 0 && x < width && y < height;
+	}
+
 	double getMagnitude() {
 		return hypot(x, y);
 	}
