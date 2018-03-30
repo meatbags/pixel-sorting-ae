@@ -38,7 +38,8 @@ enum {
 	PARAM_ORDER,
 	PARAM_ANGLE,
 	PARAM_LENGTH,
-	PARAM_THRESHOLD,
+	PARAM_THRESHOLD_LOWER,
+	PARAM_THRESHOLD_UPPER,
 	PARAM_CENTRE,
 	PARAM_MASK_ACTIVE,
 	PARAM_MASK_LAYER,
@@ -52,7 +53,8 @@ typedef struct {
 	int order;
 	double angle;
 	int length;
-	double threshold;
+	double threshold_lower;
+	double threshold_upper;
 	Vector vec = Vector(0, 0);
 	Vector centre = Vector(0, 0);
 	PF_EffectWorld *ref;

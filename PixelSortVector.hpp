@@ -9,6 +9,7 @@
 #define HALF_PI 1.57079632
 #define CLAMP(mn, mx, x) (max(mn, min(mx, x)))
 #define BLEND(a, b, x) (a * (1 - x) + b * x)
+//#define QUARTER_PI 0.78539816
 //#define SQRT2 1.41421356
 //#define SQRT2_HALF 0.70710678
 //#define SQRT2_MINUS_ONE 0.41421356

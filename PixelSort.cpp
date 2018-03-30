@@ -16,7 +16,7 @@ static PF_Err PixelSort8(
 	AEGP_MemHandle mem_handle;
 	int mem_size = info->length * sizeof(PixelKey8);
 	PixelKey8 *pixels;
-	ERR(suites.MemorySuite1()->AEGP_NewMemHandle(NULL, "PixelIndex8[] memory allocation error.", mem_size, AEGP_MemFlag_NONE, &mem_handle));
+	ERR(suites.MemorySuite1()->AEGP_NewMemHandle(NULL, "PixelIndex8[] memory allocation error.", mem_size, AEGP_MemFlag_CLEAR, &mem_handle));
 	ERR(suites.MemorySuite1()->AEGP_LockMemHandle(mem_handle, (void**)&pixels));
 	
 	// sort
@@ -63,17 +63,18 @@ Render(
 
 	// get user options
 	AEFX_CLR_STRUCT(info);
-	info.mode = (int)params[PARAM_MODE]->u.pd.value;
-	info.key = (int)params[PARAM_KEY]->u.pd.value;
-	info.order = (int)params[PARAM_ORDER]->u.pd.value;
-	info.angle = FIX2D(params[PARAM_ANGLE]->u.ad.value) * PF_RAD_PER_DEGREE;
-	info.vec.set(cos(info.angle), sin(info.angle));
-	info.length = (int)params[PARAM_LENGTH]->u.sd.value;
-	info.threshold = params[PARAM_THRESHOLD]->u.fs_d.value / 100.0;
+	info.mode = params[PARAM_MODE]->u.pd.value;
+	info.key = params[PARAM_KEY]->u.pd.value;
+	info.order = params[PARAM_ORDER]->u.pd.value;
+	info.angle = -(FIX2D(params[PARAM_ANGLE]->u.ad.value) * PF_RAD_PER_DEGREE - HALF_PI);
+	info.vec.set(cos(info.angle), -sin(info.angle));
+	info.length = params[PARAM_LENGTH]->u.sd.value;
+	info.threshold_lower = params[PARAM_THRESHOLD_LOWER]->u.fs_d.value / 100.0;
+	info.threshold_upper = params[PARAM_THRESHOLD_UPPER]->u.fs_d.value / 100.0;
 	info.centre.set(FIX2D(params[PARAM_CENTRE]->u.td.x_value), FIX2D(params[PARAM_CENTRE]->u.td.y_value));
 	info.ref = inputP;
 	info.in_data = in_data;
-	info.mask_active = params[PARAM_MASK_ACTIVE]->u.bd.value == 1;
+	info.mask_active = (params[PARAM_MASK_ACTIVE]->u.bd.value == 1);
 	if (info.mask_active) {
 		info.mask = &params[PARAM_MASK_LAYER]->u.ld;
 		info.mask_scale = FIX2D(params[PARAM_MASK_SCALE]->u.ad.value) / 100.0;
@@ -121,17 +122,19 @@ static PF_Err ParamsSetup(
 	PF_ParamDef	def;
 
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_POPUP("Mode", 4, 1, "Vector|Vertical|Horizontal|Radial", PARAM_MODE);
+	PF_ADD_POPUP("Mode", 2, 1, "Directional|Radial", PARAM_MODE);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_POPUP("Compare", 2, 1, "Lightness|Darkness", PARAM_KEY);
+	PF_ADD_POPUP("Compare", 4, 1, "Brightness|Red|Green|Blue", PARAM_KEY);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_POPUP("Order", 4, 1, "Ascending|Descending|Dip|Rise", PARAM_ORDER);
+	PF_ADD_POPUP("Order", 5, 1, "Descend|Ascend|Dip|Rise|Pepper", PARAM_ORDER);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_ANGLE("Direction", 45, PARAM_ANGLE);
+	PF_ADD_ANGLE("Rotate", 180, PARAM_ANGLE);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_SLIDER("Length", 1, 3000, 1, 100, 8, PARAM_LENGTH);
+	PF_ADD_SLIDER("Length", 1, 3000, 1, 100, 32, PARAM_LENGTH);
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_FLOAT_SLIDER("Threshold", 0, 100, 0, 100, 0, 50, 0, 0, 0, PARAM_THRESHOLD);
+	PF_ADD_FLOAT_SLIDER("Lower Threshold", 0, 100, 0, 100, 0, 0, 0, 0, 0, PARAM_THRESHOLD_LOWER);
+	AEFX_CLR_STRUCT(def);
+	PF_ADD_FLOAT_SLIDER("Upper Threshold", 0, 100, 0, 100, 0, 50, 0, 0, 0, PARAM_THRESHOLD_UPPER);
 	AEFX_CLR_STRUCT(def);
 	PF_ADD_POINT("Centre", 0, 0, 0, PARAM_CENTRE);
 	AEFX_CLR_STRUCT(def);
