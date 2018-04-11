@@ -15,6 +15,8 @@
 struct PixelKey8 {
 	PF_Pixel8 *pixel;
 	double key;
+	double x;
+	double y;
 };
 
 PF_Pixel8 *getPixel8(
@@ -23,6 +25,30 @@ PF_Pixel8 *getPixel8(
 	int y
 ) {
 	return ((PF_Pixel8 *)((char*)inputP->data + (y * inputP->rowbytes) + x * sizeof(PF_Pixel8)));
+}
+
+void sampleBilinear8(
+	PF_EffectWorld *input,
+	double u,
+	double v,
+	PF_Pixel8 *out
+) {
+	int x = (int)u;
+	int y = (int)v;
+	u -= x;
+	v -= y;
+	PF_Pixel *a = getPixel8(input, x, y);
+	PF_Pixel *b = getPixel8(input, x + 1, y);
+	PF_Pixel *c = getPixel8(input, x, y + 1);
+	PF_Pixel *d = getPixel8(input, x + 1, y + 1);
+	double at = (1 - u) * (1 - v);
+	double bt = u * (1 - v);
+	double ct = v * (1 - u);
+	double dt = u * v;
+	out->alpha = (A_u_char)(a->alpha * at + b->alpha * bt + c->alpha * ct + d->alpha * dt);
+	out->red = (A_u_char)(a->red * at + b->red * bt + c->red * ct + d->red * dt);
+	out->green = (A_u_char)(a->green * at + b->green * bt + c->green * ct + d->green * dt);
+	out->blue = (A_u_char)(a->blue * at + b->blue * bt + c->blue * ct + d->blue * dt);
 }
 
 void copyPixel8(
@@ -152,15 +178,15 @@ bool setKey8(
 
 struct Sorter8 {
 	Vector vec = Vector(0, 0);
-	A_long orig_x;
-	A_long orig_y;
 	int pixel_index;
 	int chunk_length;
+	double orig_x;
+	double orig_y;
 
 	Sorter8(A_long x, A_long y, Vector normal) {
-		orig_x = x;
-		orig_y = y;
 		vec = projectGrid(x + 0.5, y + 0.5, normal);
+		orig_x = vec.x;
+		orig_y = vec.y;
 	}
 
 	void generateChunk8(
@@ -176,14 +202,14 @@ struct Sorter8 {
 				pixels[index].pixel = getPixel8(info->ref, (int)vec.x, (int)vec.y);
 
 				if (setKey8(&pixels[index], info->key, info->threshold_lower, info->threshold_upper)) {
+					pixels[index].x = vec.x;
+					pixels[index].y = vec.y;
 					pixel_count++;
 					vec.sub(info->vec);
-				}
-				else {
+				} else {
 					break;
 				}
-			}
-			else {
+			} else {
 				break;
 			}
 		}
@@ -210,6 +236,8 @@ struct Sorter8 {
 					pixels[i].pixel = getPixel8(info->ref, (int)vec.x, (int)vec.y);
 
 					if (setKey8(&pixels[i], info->key, info->threshold_lower, info->threshold_upper)) {
+						pixels[i].x = vec.x;
+						pixels[i].y = vec.y;
 						pixel_count++;
 						vec.add(info->vec);
 					}
@@ -229,13 +257,24 @@ struct Sorter8 {
 		PixelKey8 *pixels
 	) {
 		PF_Err err = PF_Err_NONE;
+		double sample_x, sample_y;
 		generateChunk8(info, pixels);
 
+		// sort chunks, get pixel coords
 		if (chunk_length > 1) {
 			sortPixels8(pixels, chunk_length, info->order);
-			copyPixel8(pixels[pixel_index].pixel, out);
+			sample_x = CLAMP(0.0, info->ref->width - 1, pixels[pixel_index].x);
+			sample_y = CLAMP(0.0, info->ref->height - 1, pixels[pixel_index].y);
+		} else {	
+			sample_x = CLAMP(0.0, info->ref->width - 1, orig_x);
+			sample_y = CLAMP(0.0, info->ref->height - 1, orig_y);
+		}
+
+		// bilinear or nn sampling
+		if (sample_x < info->ref->width - 1 && sample_y < info->ref->height - 1) {
+			sampleBilinear8(info->ref, sample_x, sample_y, out);
 		} else {
-			copyPixel8(getPixel8(info->ref, orig_x, orig_y), out);
+			copyPixel8(getPixel8(info->ref, (int)sample_x, (int)sample_y), out);
 		}
 
 		return err;
